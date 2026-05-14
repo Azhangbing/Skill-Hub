@@ -386,6 +386,136 @@ router.post('/batch', authMiddleware, (req, res) => {
   });
 });
 
+// Folder upload - 文件夹上传（打包为ZIP）
+router.post('/folder', authMiddleware, (req, res) => {
+  upload.array('files', 100)(req, res, async (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: '文件大小超过50MB限制' });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ message: '最多支持100个文件' });
+      }
+      return res.status(400).json({ message: '文件上传失败: ' + err.message });
+    }
+
+    try {
+      const { title, category, project_id, description, relativePaths } = req.body;
+      const files = req.files || [];
+
+      if (files.length === 0) {
+        return res.status(400).json({ message: '请选择要上传的文件夹' });
+      }
+
+      if (!title) {
+        return res.status(400).json({ message: '标题是必填项' });
+      }
+
+      if (!category) {
+        return res.status(400).json({ message: '分类是必填项' });
+      }
+
+      if (category === '项目' && !project_id) {
+        return res.status(400).json({ message: '项目分类必须选择项目目录' });
+      }
+
+      // 检查标题是否已存在
+      const [existingSkills] = await pool.execute(
+        'SELECT id FROM skills WHERE title = ?',
+        [title]
+      );
+
+      if (existingSkills.length > 0) {
+        return res.status(400).json({ message: 'Skill名称已存在，请使用不同的名称' });
+      }
+
+      const projectIdValue = category === '项目' ? parseInt(project_id) : null;
+      const userRole = req.user.role;
+      const status = (userRole === 'super_admin' || userRole === 'admin') ? 'approved' : 'pending';
+
+      // 打包文件夹为ZIP文件
+      const archiver = require('archiver');
+      const slug = generateSlug(title);
+      const zipFileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}-${slug}.zip`;
+      const zipFilePath = path.join(uploadsDir, zipFileName);
+
+      // 创建ZIP文件
+      const output = fs.createWriteStream(zipFilePath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      archive.pipe(output);
+
+      // 添加文件到ZIP，保留目录结构
+      const paths = Array.isArray(relativePaths) ? relativePaths : [relativePaths];
+      files.forEach((file, index) => {
+        const relativePath = paths[index] || file.originalname;
+        // 从路径中移除根文件夹名，保留内部结构
+        const internalPath = relativePath.split('/').slice(1).join('/') || file.originalname;
+        archive.file(file.path, { name: internalPath });
+      });
+
+      await archive.finalize();
+
+      // 等待ZIP完成
+      await new Promise((resolve, reject) => {
+        output.on('close', resolve);
+        output.on('error', reject);
+      });
+
+      // 检查ZIP文件大小
+      const zipStats = fs.statSync(zipFilePath);
+      if (zipStats.size > 50 * 1024 * 1024) {
+        fs.unlinkSync(zipFilePath);
+        return res.status(400).json({ message: '打包后的ZIP文件超过50MB限制' });
+      }
+
+      const filePath = `/uploads/${zipFileName}`;
+
+      // 删除原始文件（已打包到ZIP）
+      files.forEach(file => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
+
+      const [result] = await pool.execute(
+        `INSERT INTO skills (title, slug, description, category, project_id, file_path, author_id, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [title, slug, description || '', category, projectIdValue, filePath, req.user.employee_id, status]
+      );
+
+      res.status(201).json({
+        message: status === 'approved' ? '文件夹上传成功' : '上传申请已提交，等待管理员审核',
+        status: status,
+        skill: {
+          id: result.insertId,
+          title,
+          slug,
+          description,
+          category,
+          project_id: projectIdValue,
+          file_path: filePath,
+          author_id: req.user.employee_id,
+          status: status
+        }
+      });
+
+    } catch (error) {
+      console.error('Folder upload error:', error);
+      // 清理临时文件
+      if (req.files) {
+        req.files.forEach(file => {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        });
+      }
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+});
+
 // Update skill
 router.put('/:id', authMiddleware, (req, res) => {
   upload.single('file')(req, res, async (err) => {

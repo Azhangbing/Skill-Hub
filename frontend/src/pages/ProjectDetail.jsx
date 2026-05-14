@@ -13,6 +13,10 @@ export default function ProjectDetail() {
   const [selectedSkills, setSelectedSkills] = useState([])
   const [downloadLink, setDownloadLink] = useState('')
   const [linkCopied, setLinkCopied] = useState(false)
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [showDirDialog, setShowDirDialog] = useState(false)
+  const [selectedDir, setSelectedDir] = useState('')
+  const [dirInputValue, setDirInputValue] = useState('')
 
   useEffect(() => {
     fetchProject()
@@ -91,16 +95,71 @@ export default function ProjectDetail() {
   }
 
   // 生成下载链接
-  const generateDownloadLink = async () => {
+  const generateDownloadLink = () => {
     if (selectedSkills.length === 0) {
       alert('请选择至少一个技能')
       return
     }
+    // 打开目录选择对话框
+    setShowDirDialog(true)
+    setDirInputValue('')
+  }
 
-    const serverUrl = 'http://172.16.91.149:8080'
-    const command = `curl -s "${serverUrl}/api/skills/batch-install-link?ids=${selectedSkills.join(',')}" | python`
-    setDownloadLink(command)
-    setLinkCopied(false)
+  // 处理目录选择
+  const handleDirSelect = (e) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      const relativePath = file.webkitRelativePath
+      const dirName = relativePath.split('/')[0]
+      setDirInputValue(dirName)
+    }
+  }
+
+  // 确认目录并生成链接
+  const confirmDirAndGenerateLink = async () => {
+    setShowDirDialog(false)
+    setBatchLoading(true)
+    try {
+      const targetDir = dirInputValue || selectedDir
+
+      const response = await api.post('/skills/batch-install', {
+        skillIds: selectedSkills,
+        type: 'link',
+        targetDir: targetDir
+      })
+
+      setDownloadLink(response.data.link)
+      setSelectedDir(targetDir)
+      setLinkCopied(false)
+    } catch (error) {
+      console.error('Generate link error:', error)
+      alert(error.response?.data?.message || '生成链接失败')
+    } finally {
+      setBatchLoading(false)
+    }
+  }
+
+  // 不指定目录，使用默认路径
+  const generateLinkWithDefaultDir = async () => {
+    setShowDirDialog(false)
+    setBatchLoading(true)
+    try {
+      const response = await api.post('/skills/batch-install', {
+        skillIds: selectedSkills,
+        type: 'link',
+        targetDir: ''
+      })
+
+      setDownloadLink(response.data.link)
+      setSelectedDir('')
+      setLinkCopied(false)
+    } catch (error) {
+      console.error('Generate link error:', error)
+      alert(error.response?.data?.message || '生成链接失败')
+    } finally {
+      setBatchLoading(false)
+    }
   }
 
   // 复制下载链接
@@ -113,6 +172,8 @@ export default function ProjectDetail() {
   const closeDownloadLink = () => {
     setDownloadLink('')
     setLinkCopied(false)
+    setSelectedDir('')
+    setDirInputValue('')
   }
 
   // 从file_path提取文件名
@@ -247,6 +308,11 @@ export default function ProjectDetail() {
                 </svg>
               </button>
             </div>
+            {selectedDir && (
+              <p className="text-green-700 text-sm mb-2">
+                目标目录: <span className="font-medium">{selectedDir}</span>
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-white px-4 py-2 rounded font-mono text-sm text-gray-800 overflow-x-auto">
                 {downloadLink}
@@ -260,6 +326,11 @@ export default function ProjectDetail() {
                 {linkCopied ? '已复制' : '复制'}
               </button>
             </div>
+            <p className="text-green-600 text-sm mt-2">
+              {selectedDir
+                ? `将此链接复制到任意终端运行，技能将下载到 ${selectedDir} 目录`
+                : '将此链接复制到任意终端运行，技能将下载到当前目录的 .skill 文件夹'}
+            </p>
           </div>
         )}
 
@@ -347,6 +418,82 @@ export default function ProjectDetail() {
           </div>
         )}
       </div>
+
+      {/* 目录选择弹窗 */}
+      {showDirDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">设置下载目录</h3>
+              <button
+                onClick={() => setShowDirDialog(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-gray-600 text-sm">
+                输入技能下载的目标目录完整路径。生成的链接可在任意终端运行，技能将下载到指定目录。
+              </p>
+
+              {/* 手动输入完整路径 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  目标目录完整路径 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={dirInputValue}
+                  onChange={(e) => setDirInputValue(e.target.value)}
+                  placeholder="例如: /home/user/projects/test 或 D:\\projects\\test"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  <strong>重要：</strong>请输入完整的绝对路径，确保目录存在或脚本会自动创建。
+                </p>
+              </div>
+
+              {/* 快捷选择按钮 */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDirInputValue('./.skill')}
+                  className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-sm hover:bg-gray-200 transition"
+                >
+                  当前目录/.skill
+                </button>
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  onClick={() => setShowDirDialog(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={generateLinkWithDefaultDir}
+                  disabled={batchLoading}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50"
+                >
+                  使用默认目录
+                </button>
+                <button
+                  onClick={confirmDirAndGenerateLink}
+                  disabled={batchLoading || !dirInputValue.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {batchLoading ? '生成中...' : '确认并生成链接'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

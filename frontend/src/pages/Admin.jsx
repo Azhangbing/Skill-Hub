@@ -20,6 +20,9 @@ export default function Admin() {
   const [search, setSearch] = useState('')
   const [error, setError] = useState(null)
 
+  // 技能批量选择状态
+  const [selectedSkillIds, setSelectedSkillIds] = useState([])
+
   useEffect(() => {
     if (!user) {
       navigate('/login')
@@ -107,6 +110,48 @@ export default function Admin() {
       alert('技能已删除')
     } catch (error) {
       alert('删除失败')
+    }
+  }
+
+  // 技能批量选择功能
+  const toggleSkillSelection = (id) => {
+    setSelectedSkillIds(prev =>
+      prev.includes(id)
+        ? prev.filter(skillId => skillId !== id)
+        : [...prev, skillId]
+    )
+  }
+
+  const selectAllSkills = () => {
+    const allIds = skills.map(s => s.id)
+    setSelectedSkillIds(allIds)
+  }
+
+  const deselectAllSkills = () => {
+    setSelectedSkillIds([])
+  }
+
+  const isAllSkillsSelected = () => {
+    return skills.length > 0 && skills.every(s => selectedSkillIds.includes(s.id))
+  }
+
+  const deleteSelectedSkills = async () => {
+    if (selectedSkillIds.length === 0) {
+      alert('请先选择要删除的技能')
+      return
+    }
+    if (!window.confirm(`确定要删除选中的 ${selectedSkillIds.length} 个技能吗？此操作不可恢复！`)) return
+    try {
+      // 批量删除
+      for (const id of selectedSkillIds) {
+        await api.delete(`/admin/skills/${id}`)
+      }
+      fetchSkills()
+      fetchStats()
+      setSelectedSkillIds([])
+      alert(`已删除 ${selectedSkillIds.length} 个技能`)
+    } catch (error) {
+      alert('批量删除失败')
     }
   }
 
@@ -570,50 +615,100 @@ export default function Admin() {
 
             {/* Skills Tab */}
             {activeTab === 'skills' && (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left">标题</th>
-                      <th className="px-4 py-2 text-left">分类</th>
-                      <th className="px-4 py-2 text-left">作者</th>
-                      <th className="px-4 py-2 text-left">下载</th>
-                      <th className="px-4 py-2 text-left">评论</th>
-                      <th className="px-4 py-2 text-left">附件</th>
-                      <th className="px-4 py-2 text-left">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {skills.map(s => (
-                      <tr key={s.id} className="border-b hover:bg-gray-50">
-                        <td className="px-4 py-2 font-medium">
-                          <a href={`/skill/${s.id}`} className="text-primary-600 hover:underline" target="_blank">
-                            {s.title}
-                          </a>
-                        </td>
-                        <td className="px-4 py-2">
-                          <span className="bg-primary-100 text-primary-600 px-2 py-1 rounded text-sm">
-                            {s.category}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2">{s.author_name}</td>
-                        <td className="px-4 py-2">{s.downloads}</td>
-                        <td className="px-4 py-2">{s.comment_count}</td>
-                        <td className="px-4 py-2">
-                          {s.file_path ? '✓' : '-'}
-                        </td>
-                        <td className="px-4 py-2">
-                          <button
-                            onClick={() => deleteSkill(s.id, s.title)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            删除
-                          </button>
-                        </td>
+              <div>
+                {/* 批量操作工具栏 */}
+                <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <span className="text-gray-700">
+                      已选择 {selectedSkillIds.length} 个技能
+                    </span>
+                    <button
+                      onClick={isAllSkillsSelected() ? deselectAllSkills : selectAllSkills}
+                      className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      {isAllSkillsSelected() ? '取消全选' : '全选'}
+                    </button>
+                    <button
+                      onClick={deselectAllSkills}
+                      className="text-sm text-gray-600 hover:text-gray-700"
+                    >
+                      清空选择
+                    </button>
+                  </div>
+                  {selectedSkillIds.length > 0 && (
+                    <button
+                      onClick={deleteSelectedSkills}
+                      className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      批量删除 ({selectedSkillIds.length})
+                    </button>
+                  )}
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left w-8">
+                          <input
+                            type="checkbox"
+                            checked={isAllSkillsSelected()}
+                            onChange={isAllSkillsSelected() ? deselectAllSkills : selectAllSkills}
+                            className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          />
+                        </th>
+                        <th className="px-4 py-2 text-left">标题</th>
+                        <th className="px-4 py-2 text-left">分类</th>
+                        <th className="px-4 py-2 text-left">作者</th>
+                        <th className="px-4 py-2 text-left">下载</th>
+                        <th className="px-4 py-2 text-left">评论</th>
+                        <th className="px-4 py-2 text-left">附件</th>
+                        <th className="px-4 py-2 text-left">操作</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {skills.map(s => (
+                        <tr key={s.id} className={`border-b hover:bg-gray-50 ${selectedSkillIds.includes(s.id) ? 'bg-primary-50' : ''}`}>
+                          <td className="px-4 py-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedSkillIds.includes(s.id)}
+                              onChange={() => toggleSkillSelection(s.id)}
+                              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                          </td>
+                          <td className="px-4 py-2 font-medium">
+                            <a href={`/skill/${s.id}`} className="text-primary-600 hover:underline" target="_blank">
+                              {s.title}
+                            </a>
+                          </td>
+                          <td className="px-4 py-2">
+                            <span className="bg-primary-100 text-primary-600 px-2 py-1 rounded text-sm">
+                              {s.category}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2">{s.author_name}</td>
+                          <td className="px-4 py-2">{s.downloads}</td>
+                          <td className="px-4 py-2">{s.comment_count}</td>
+                          <td className="px-4 py-2">
+                            {s.file_path ? '✓' : '-'}
+                          </td>
+                          <td className="px-4 py-2">
+                            <button
+                              onClick={() => deleteSkill(s.id, s.title)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              删除
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 

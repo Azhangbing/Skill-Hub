@@ -67,10 +67,16 @@ export default function Upload() {
     }
   }
 
-  // 单个上传 - 选择文件
+  // 单个上传 - 选择ZIP文件
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0]
     if (selectedFile) {
+      // 检查是否为ZIP文件
+      const ext = selectedFile.name.split('.').pop().toLowerCase()
+      if (ext !== 'zip') {
+        setResult({ success: false, message: '请选择 ZIP 文件或文件夹' })
+        return
+      }
       if (selectedFile.size > 50 * 1024 * 1024) {
         setResult({ success: false, message: '文件大小超过50MB限制' })
         return
@@ -78,6 +84,11 @@ export default function Upload() {
       setFile(selectedFile)
       setFolderFiles([])
       setFolderName('')
+      // 自动填充标题（去掉.zip后缀）
+      if (!form.title) {
+        const titleFromFile = selectedFile.name.replace(/\.[^/.]+$/, '')
+        setForm(prev => ({ ...prev, title: titleFromFile }))
+      }
     }
   }
 
@@ -240,11 +251,21 @@ export default function Upload() {
     setFolderName('')
   }
 
-  // 批量上传：选择多个文件
+  // 批量上传：选择多个ZIP文件
   const handleBatchFilesChange = (e) => {
     const files = Array.from(e.target.files)
-    const validFiles = files.filter(f => f.size <= 50 * 1024 * 1024)
-    const oversizedFiles = files.filter(f => f.size > 50 * 1024 * 1024)
+    // 过滤出ZIP文件
+    const zipFiles = files.filter(f => {
+      const ext = f.name.split('.').pop().toLowerCase()
+      return ext === 'zip'
+    })
+
+    if (zipFiles.length < files.length) {
+      alert(`已过滤非 ZIP 文件，只支持 ZIP 文件和文件夹`)
+    }
+
+    const validFiles = zipFiles.filter(f => f.size <= 50 * 1024 * 1024)
+    const oversizedFiles = zipFiles.filter(f => f.size > 50 * 1024 * 1024)
 
     if (oversizedFiles.length > 0) {
       alert(`以下文件超过50MB限制：${oversizedFiles.map(f => f.name).join(', ')}`)
@@ -254,7 +275,8 @@ export default function Upload() {
       file: f,
       title: f.name.replace(/\.[^/.]+$/, ''),
       id: Date.now() + Math.random(),
-      isFolder: false
+      isFolder: false,
+      isZip: true
     }))
     setBatchFiles(prev => [...prev, ...filesWithTitles])
   }
@@ -569,38 +591,40 @@ export default function Upload() {
             <div className="mb-6">
               <label className="block text-gray-700 mb-2 font-medium">附件文件（可选）</label>
               <p className="text-sm text-gray-500 mb-3">
-                支持选择单个文件或文件夹。文件夹会打包为 ZIP 上传。最大 50MB。
+                支持选择 ZIP 文件或文件夹上传。文件夹会打包为 ZIP。最大 50MB。
               </p>
 
-              <div className="flex gap-3 mb-3">
-                {/* 选择文件按钮 */}
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-primary-500 transition text-center flex-1">
-                  <input type="file" onChange={handleFileChange} className="hidden" id="file-input" accept=".zip,.rar,.tar,.gz,.pdf,.doc,.docx,.md,.txt,.json,.js,.ts,.py,.java,.cpp,.c,.h,.sql,.xml,.yaml,.yml,.sh,.bat,.png,.jpg,.jpeg,.gif,.svg,.html,.css,.vue,.jsx,.tsx,.go,.rs,.rb,.php,.swift,.kt" />
-                  <label htmlFor="file-input" className="cursor-pointer">
-                    <svg className="w-8 h-8 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <p className="text-gray-600 text-sm">选择文件</p>
-                  </label>
-                </div>
+              {/* 统一的选择按钮 */}
+              <div className="relative">
+                <input type="file" onChange={handleFileChange} className="hidden" id="file-input" accept=".zip" />
+                <input type="file" onChange={handleFolderChange} className="hidden" id="folder-input" webkitdirectory="" directory="" />
 
-                {/* 选择文件夹按钮 */}
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-primary-500 transition text-center flex-1">
-                  <input type="file" onChange={handleFolderChange} className="hidden" id="folder-input" webkitdirectory="" directory="" />
-                  <label htmlFor="folder-input" className="cursor-pointer">
-                    <svg className="w-8 h-8 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                    </svg>
-                    <p className="text-gray-600 text-sm">选择文件夹</p>
-                  </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-primary-500 transition text-center">
+                  <div className="flex items-center justify-center gap-3">
+                    <label htmlFor="file-input" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                      <span className="text-gray-600">选择 ZIP 文件</span>
+                    </label>
+
+                    <span className="text-gray-400">或</span>
+
+                    <label htmlFor="folder-input" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      <span className="text-gray-600">选择文件夹</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              {/* 已选择的文件 */}
+              {/* 已选择的ZIP文件 */}
               {file && (
                 <div className="p-3 bg-green-50 rounded-lg flex items-center gap-2">
                   <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                   </svg>
                   <span className="font-medium text-green-700">{file.name}</span>
                   <span className="text-gray-500 text-sm">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
@@ -652,32 +676,34 @@ export default function Upload() {
             <form onSubmit={handleBatchSubmit}>
               {/* 文件选择 */}
               <div className="mb-6">
-                <label className="block text-gray-700 mb-2 font-medium">选择文件或文件夹 *</label>
+                <label className="block text-gray-700 mb-2 font-medium">选择 ZIP 文件或文件夹 *</label>
                 <p className="text-sm text-gray-500 mb-3">
-                  可以选择多个文件或文件夹。每个文件/文件夹会创建一个技能。文件夹会打包为 ZIP。
+                  可以选择多个 ZIP 文件或文件夹。每个文件/文件夹会创建一个技能。文件夹会打包为 ZIP。
                 </p>
 
-                <div className="flex gap-3 mb-4">
-                  {/* 选择文件按钮 */}
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-primary-500 transition text-center flex-1">
-                    <input type="file" onChange={handleBatchFilesChange} className="hidden" id="batch-file-input" multiple accept=".zip,.rar,.tar,.gz,.pdf,.doc,.docx,.md,.txt,.json,.js,.ts,.py,.java,.cpp,.c,.h,.sql,.xml,.yaml,.yml,.sh,.bat,.png,.jpg,.jpeg,.gif,.svg,.html,.css,.vue,.jsx,.tsx,.go,.rs,.rb,.php,.swift,.kt" />
-                    <label htmlFor="batch-file-input" className="cursor-pointer">
-                      <svg className="w-8 h-8 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      <p className="text-gray-600 text-sm">选择多个文件</p>
-                    </label>
-                  </div>
+                {/* 统一的选择按钮 */}
+                <div className="relative">
+                  <input type="file" onChange={handleBatchFilesChange} className="hidden" id="batch-file-input" multiple accept=".zip" />
+                  <input type="file" onChange={handleBatchFolderChange} className="hidden" id="batch-folder-input" webkitdirectory="" directory="" />
 
-                  {/* 选择文件夹按钮 */}
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-primary-500 transition text-center flex-1">
-                    <input type="file" onChange={handleBatchFolderChange} className="hidden" id="batch-folder-input" webkitdirectory="" directory="" />
-                    <label htmlFor="batch-folder-input" className="cursor-pointer">
-                      <svg className="w-8 h-8 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                      </svg>
-                      <p className="text-gray-600 text-sm">选择文件夹</p>
-                    </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-primary-500 transition text-center">
+                    <div className="flex items-center justify-center gap-3">
+                      <label htmlFor="batch-file-input" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        </svg>
+                        <span className="text-gray-600">选择多个 ZIP 文件</span>
+                      </label>
+
+                      <span className="text-gray-400">或</span>
+
+                      <label htmlFor="batch-folder-input" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        <span className="text-gray-600">选择文件夹</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -694,6 +720,10 @@ export default function Upload() {
                         {item.isFolder ? (
                           <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                          </svg>
+                        ) : item.isZip ? (
+                          <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                           </svg>
                         ) : (
                           <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

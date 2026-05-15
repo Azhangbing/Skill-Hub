@@ -313,32 +313,21 @@ export default function Home() {
     <div className="space-y-6">
       {/* 欢迎区域 */}
       <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">
-              欢迎回来，{user?.username}
-              {user?.role === 'super_admin' && (
-                <span className="ml-2 bg-red-100 text-red-700 px-2 py-1 rounded text-sm font-medium">
-                  主管理员
-                </span>
-              )}
-              {user?.role === 'admin' && (
-                <span className="ml-2 bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-sm font-medium">
-                  管理员
-                </span>
-              )}
-            </h2>
-            <p className="text-gray-500 mt-1">发现和分享团队技能知识</p>
-          </div>
-          <Link
-            to="/upload"
-            className="inline-flex items-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-lg hover:bg-primary-700 transition shadow-sm"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            上传技能
-          </Link>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">
+            欢迎回来，{user?.username}
+            {user?.role === 'super_admin' && (
+              <span className="ml-2 bg-red-100 text-red-700 px-2 py-1 rounded text-sm font-medium">
+                主管理员
+              </span>
+            )}
+            {user?.role === 'admin' && (
+              <span className="ml-2 bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-sm font-medium">
+                管理员
+              </span>
+            )}
+          </h2>
+          <p className="text-gray-500 mt-1">发现和分享团队技能知识</p>
         </div>
       </div>
 
@@ -378,11 +367,7 @@ export default function Home() {
         </Link>
         <button
           onClick={toggleBatchMode}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-            batchMode
-              ? 'bg-orange-600 text-white shadow-sm'
-              : 'bg-white text-gray-600 hover:bg-gray-50 shadow-sm'
-          }`}
+          className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 transition shadow-sm"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -398,7 +383,7 @@ export default function Home() {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-gray-100">
             <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               <span className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -408,9 +393,6 @@ export default function Home() {
               个人技能
               <span className="text-sm font-normal text-gray-400">({filteredSkills.length})</span>
             </h3>
-            <Link to="/upload" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-              + 上传新技能
-            </Link>
           </div>
           {filteredSkills.length === 0 ? (
             <div className="p-12 text-center">
@@ -583,22 +565,6 @@ export default function Home() {
                 <p className="text-xs text-gray-500 mt-2">
                   <strong>重要：</strong>请输入完整的绝对路径，确保目录存在或脚本会自动创建。
                 </p>
-              </div>
-
-              {/* 快捷选择按钮 */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setDirInputValue('/home/' + (user?.username || 'user') + '/.skill')}
-                  className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-sm hover:bg-gray-200 transition"
-                >
-                  ~/.skill
-                </button>
-                <button
-                  onClick={() => setDirInputValue('./.skill')}
-                  className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-sm hover:bg-gray-200 transition"
-                >
-                  当前目录/.skill
-                </button>
               </div>
 
               {/* 操作按钮 */}

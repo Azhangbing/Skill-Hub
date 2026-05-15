@@ -52,6 +52,10 @@ export default function SkillDetail() {
   const [copied, setCopied] = useState(false)
   const [replyingTo, setReplyingTo] = useState(null) // 正在回复的评论ID
   const [replyContent, setReplyContent] = useState('') // 回复内容
+  const [installTargetDir, setInstallTargetDir] = useState('') // 安装目标目录
+  const [installLink, setInstallLink] = useState('') // 生成的安装链接
+  const [installLinkLoading, setInstallLinkLoading] = useState(false) // 链接生成加载
+  const [installLinkCopied, setInstallLinkCopied] = useState(false) // 链接复制状态
 
   useEffect(() => {
     fetchSkill()
@@ -79,6 +83,35 @@ export default function SkillDetail() {
     navigator.clipboard.writeText(skill.install_command)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  // 生成带目录参数的安装链接
+  const handleGenerateInstallLink = async () => {
+    setInstallLinkLoading(true)
+    try {
+      const serverUrl = 'http://172.16.91.149:8080'
+      const skillId = skill.slug || skill.id
+      const targetDir = installTargetDir.trim()
+
+      if (targetDir) {
+        setInstallLink(`curl -s "${serverUrl}/api/skills/${skillId}/install-link?dir=${encodeURIComponent(targetDir)}" | python`)
+      } else {
+        setInstallLink(`curl -s "${serverUrl}/api/skills/${skillId}/install" | python`)
+      }
+    } catch (error) {
+      console.error('Generate link error:', error)
+      alert('生成链接失败')
+    } finally {
+      setInstallLinkLoading(false)
+    }
+  }
+
+  // 复制安装链接
+  const handleCopyInstallLink = () => {
+    if (!installLink) return
+    navigator.clipboard.writeText(installLink)
+    setInstallLinkCopied(true)
+    setTimeout(() => setInstallLinkCopied(false), 2000)
   }
 
   // 预览文件内容
@@ -528,45 +561,98 @@ export default function SkillDetail() {
                 {installMethod === 'command' && (
                   <div className="space-y-4">
                     <div className="bg-gray-900 rounded-lg p-6">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-gray-400 text-sm">在终端执行以下命令：</span>
+                      <div className="flex items-center justify-between mb-4">
                         <span className="text-gray-400 text-sm">技能名称：{skill.title}</span>
+                        <span className="text-gray-400 text-sm">设置下载目录生成安装命令</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 bg-gray-800 text-green-400 px-4 py-3 rounded font-mono text-sm overflow-x-auto">
-                          curl -s http://172.16.91.149:8080/api/skills/{skill.slug || skill.id}/install | python
-                        </code>
-                        <button
-                          onClick={handleCopyCommand}
-                          className={`px-4 py-3 rounded transition flex items-center gap-2 ${
-                            copied ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                          }`}
-                        >
-                          {copied ? (
-                            <>
+
+                      {/* 目录输入 */}
+                      <input
+                        type="text"
+                        value={installTargetDir}
+                        onChange={(e) => setInstallTargetDir(e.target.value)}
+                        placeholder="输入目标目录，如: /home/user/project 或 D:\\work"
+                        className="w-full bg-gray-800 text-white px-4 py-3 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent mb-4"
+                      />
+
+                      {/* 生成按钮 */}
+                      <button
+                        onClick={handleGenerateInstallLink}
+                        disabled={installLinkLoading}
+                        className="w-full bg-primary-600 text-white px-4 py-3 rounded-lg hover:bg-primary-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {installLinkLoading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            生成中...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                            生成安装命令
+                          </>
+                        )}
+                      </button>
+
+                      {/* 生成的链接显示 */}
+                      {installLink && (
+                        <div className="mt-4 bg-gray-800 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-gray-400 text-sm">
+                              {installTargetDir ? `下载到: ${installTargetDir}` : '下载到当前目录'}
+                            </span>
+                            <button
+                              onClick={() => { setInstallLink(''); setInstallTargetDir(''); }}
+                              className="text-gray-500 hover:text-gray-300"
+                            >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                               </svg>
-                              已复制
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                              </svg>
-                              复制
-                            </>
-                          )}
-                        </button>
-                      </div>
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 bg-gray-700 text-green-400 px-4 py-3 rounded font-mono text-sm overflow-x-auto">
+                              {installLink}
+                            </code>
+                            <button
+                              onClick={handleCopyInstallLink}
+                              className={`px-4 py-3 rounded font-medium transition flex items-center gap-2 ${
+                                installLinkCopied ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                              }`}
+                            >
+                              {installLinkCopied ? (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  已复制
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  复制
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <h4 className="font-medium text-blue-800 mb-2">安装说明</h4>
-                      <p className="text-blue-700 text-sm">复制上方命令在目标目录执行，文件将下载到当前目录的 <code className="bg-blue-100 px-1 rounded">.skill-hub</code> 文件夹</p>
+                      <ul className="text-blue-700 text-sm space-y-1">
+                        <li>1. 输入目标目录路径（可选），不输入则下载到当前目录</li>
+                        <li>2. 点击"生成安装命令"</li>
+                        <li>3. 复制生成的命令在终端运行</li>
+                      </ul>
                       <div className="mt-3 p-2 bg-blue-100 rounded text-xs text-blue-600">
-                        <p className="font-medium mb-1">Windows PowerShell：</p>
-                        <code className="bg-blue-200 px-1 rounded">curl -s http://172.16.91.149:8080/api/skills/{skill.slug || skill.id}/install | python</code>
+                        <p className="font-medium mb-1">提示：</p>
+                        <p>生成的命令可在任意终端运行，ZIP 文件会自动解压</p>
                       </div>
                     </div>
                   </div>

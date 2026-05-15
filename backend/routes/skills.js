@@ -127,7 +127,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res, next) => {
   try {
     // 特殊路径：batch-install-link 是批量下载链接接口，跳过此路由
-    if (req.params.id === 'batch-install-link') {
+    if (req.params.id === 'batch-install-link' || req.params.id === 'install-link') {
       return next('route');
     }
 
@@ -237,16 +237,6 @@ router.post('/', authMiddleware, (req, res) => {
         return res.status(400).json({ message: '项目分类必须选择项目目录' });
       }
 
-      // 检查标题是否已存在
-      const [existingSkills] = await pool.execute(
-        'SELECT id FROM skills WHERE title = ?',
-        [title]
-      );
-
-      if (existingSkills.length > 0) {
-        return res.status(400).json({ message: 'Skill名称已存在，请使用不同的名称' });
-      }
-
       const projectIdValue = category === '项目' ? parseInt(project_id) : null;
 
       // 生成slug
@@ -321,23 +311,6 @@ router.post('/batch', authMiddleware, (req, res) => {
       const userRole = req.user.role;
       const status = (userRole === 'super_admin' || userRole === 'admin') ? 'approved' : 'pending';
 
-      // 检查所有标题是否有重复
-      const uniqueTitles = new Set(titles.filter(Boolean));
-      if (uniqueTitles.size < titles.filter(Boolean).length) {
-        return res.status(400).json({ message: '批量上传的文件中存在重复的标题' });
-      }
-
-      // 检查标题是否与已有技能重复
-      for (const title of titles.filter(Boolean)) {
-        const [existingSkills] = await pool.execute(
-          'SELECT id FROM skills WHERE title = ?',
-          [title]
-        );
-        if (existingSkills.length > 0) {
-          return res.status(400).json({ message: `Skill名称"${title}"已存在，请使用不同的名称` });
-        }
-      }
-
       const results = [];
       let successCount = 0;
       let failCount = 0;
@@ -388,14 +361,14 @@ router.post('/batch', authMiddleware, (req, res) => {
 
 // Folder upload - 文件夹上传（打包为ZIP）
 router.post('/folder', authMiddleware, (req, res) => {
-  upload.array('files', 100)(req, res, async (err) => {
+  upload.array('files', 200)(req, res, async (err) => {
     if (err) {
       console.error('Multer error:', err);
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ message: '文件大小超过50MB限制' });
       }
       if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-        return res.status(400).json({ message: '最多支持100个文件' });
+        return res.status(400).json({ message: '最多支持200个文件' });
       }
       return res.status(400).json({ message: '文件上传失败: ' + err.message });
     }
@@ -420,29 +393,19 @@ router.post('/folder', authMiddleware, (req, res) => {
         return res.status(400).json({ message: '项目分类必须选择项目目录' });
       }
 
-      // 检查标题是否已存在
-      const [existingSkills] = await pool.execute(
-        'SELECT id FROM skills WHERE title = ?',
-        [title]
-      );
-
-      if (existingSkills.length > 0) {
-        return res.status(400).json({ message: 'Skill名称已存在，请使用不同的名称' });
-      }
-
       const projectIdValue = category === '项目' ? parseInt(project_id) : null;
       const userRole = req.user.role;
       const status = (userRole === 'super_admin' || userRole === 'admin') ? 'approved' : 'pending';
 
       // 打包文件夹为ZIP文件
-      const archiver = require('archiver');
+      const { ZipArchive } = require('archiver');
       const slug = generateSlug(title);
       const zipFileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}-${slug}.zip`;
       const zipFilePath = path.join(uploadsDir, zipFileName);
 
       // 创建ZIP文件
       const output = fs.createWriteStream(zipFilePath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const archive = new ZipArchive({ zlib: { level: 9 } });
 
       archive.pipe(output);
 
@@ -855,12 +818,13 @@ import sys
 import os
 import urllib.request
 import shutil
+import zipfile
 
 SERVER_URL = "${serverUrl}"
 SKILL_ID = ${skillId}
 SKILL_TITLE = "${skill.title}"
 
-def download_skill():
+def download_and_extract():
     file_url = f"{SERVER_URL}/api/skills/{SKILL_ID}/file"
 
     target_dir = os.getcwd()
@@ -880,12 +844,35 @@ def download_skill():
             if 'filename=' in content_disp:
                 filename = content_disp.split('filename=')[1].strip().strip('"')
 
-            file_path = os.path.join(skill_dir, filename)
-            with open(file_path, 'wb') as f:
+            # Download to temp location
+            temp_path = os.path.join(skill_dir, '_temp_' + filename)
+            with open(temp_path, 'wb') as f:
                 shutil.copyfileobj(response, f)
 
-            file_size = os.path.getsize(file_path)
-            print(f"Saved: {filename} ({file_size} bytes)")
+            file_size = os.path.getsize(temp_path)
+
+            # Check if it's a ZIP file and extract
+            if filename.lower().endswith('.zip') or zipfile.is_zipfile(temp_path):
+                # Create extraction folder using skill title
+                extract_name = SKILL_TITLE if not SKILL_TITLE.lower().endswith('.zip') else SKILL_TITLE[:-4]
+                extract_dir = os.path.join(skill_dir, extract_name)
+                os.makedirs(extract_dir, exist_ok=True)
+
+                print("Extracting...")
+                with zipfile.ZipFile(temp_path, 'r') as zf:
+                    zf.extractall(extract_dir)
+
+                # Remove the ZIP file after extraction
+                os.remove(temp_path)
+
+                # Count extracted files
+                extracted_files = [f for f in os.listdir(extract_dir) if not f.startswith('.')]
+                print(f"Extracted: {extract_name}/ ({len(extracted_files)} files)")
+            else:
+                # Not a ZIP, just rename to final name
+                final_path = os.path.join(skill_dir, filename)
+                os.rename(temp_path, final_path)
+                print(f"Saved: {filename} ({file_size} bytes)")
 
         from datetime import datetime
         info_file = os.path.join(skill_dir, "skill_info.txt")
@@ -896,14 +883,14 @@ def download_skill():
 
         print("")
         print("=" * 50)
-        print("Done! File saved to: " + skill_dir)
+        print("Done! Files saved to: " + skill_dir)
         print("=" * 50)
 
     except Exception as e:
         print(f"Error: {e}")
 
 if __name__ == "__main__":
-    download_skill()
+    download_and_extract()
 `;
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -914,6 +901,151 @@ if __name__ == "__main__":
     [skill.id]
   );
 }
+
+// 单个技能的安装链接 - 支持指定目录
+router.get('/:id/install-link', async (req, res) => {
+  try {
+    const param = req.params.id;
+    const targetDir = req.query.dir ? decodeURIComponent(req.query.dir) : null;
+
+    // 先尝试用ID查找（如果是数字）
+    let skill = null;
+    if (/^\d+$/.test(param)) {
+      const [skillsById] = await pool.execute(
+        'SELECT s.id, s.title, s.slug, s.file_path, s.content, s.description, s.category, s.status FROM skills s WHERE s.id = ?',
+        [parseInt(param)]
+      );
+      if (skillsById.length > 0) {
+        skill = skillsById[0];
+      }
+    }
+
+    // 如果ID没找到或者不是数字，尝试用slug或title查找
+    if (!skill) {
+      const [skills] = await pool.execute(
+        'SELECT s.id, s.title, s.slug, s.file_path, s.content, s.description, s.category, s.status FROM skills s WHERE s.slug = ? OR s.title = ?',
+        [param, param]
+      );
+      if (skills.length > 0) {
+        skill = skills[0];
+      }
+    }
+
+    if (!skill) {
+      return res.status(404).send('# Error: Skill not found');
+    }
+
+    // 检查技能状态
+    if (skill.status !== 'approved') {
+      return res.status(403).send('# Error: 该技能未通过审核，无法安装');
+    }
+
+    const serverUrl = 'http://172.16.91.149:8080';
+    const skillId = skill.id;
+    const skillTitle = skill.title.replace(/"/g, '\\"');
+    const targetDirCode = targetDir ? `TARGET_DIR = "${targetDir.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : 'TARGET_DIR = None';
+
+    const pythonScript = `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Skill Hub Installer - ${skill.title}"""
+
+import sys
+import os
+import urllib.request
+import shutil
+import zipfile
+
+SERVER_URL = "${serverUrl}"
+SKILL_ID = ${skillId}
+SKILL_TITLE = "${skillTitle}"
+
+${targetDirCode}
+
+def download_and_extract():
+    file_url = f"{SERVER_URL}/api/skills/{SKILL_ID}/file"
+
+    # 使用指定目录或当前目录
+    if TARGET_DIR:
+        target_dir = TARGET_DIR
+    else:
+        target_dir = os.getcwd()
+
+    print(f"Downloading: {SKILL_TITLE}")
+    print(f"Target: {target_dir}")
+
+    try:
+        skill_dir = target_dir
+        os.makedirs(skill_dir, exist_ok=True)
+
+        print("Downloading...")
+        req = urllib.request.Request(file_url)
+        with urllib.request.urlopen(req) as response:
+            content_disp = response.headers.get('Content-Disposition', '')
+            filename = SKILL_TITLE
+            if 'filename=' in content_disp:
+                filename = content_disp.split('filename=')[1].strip().strip('"')
+
+            # Download to temp location
+            temp_path = os.path.join(skill_dir, '_temp_' + filename)
+            with open(temp_path, 'wb') as f:
+                shutil.copyfileobj(response, f)
+
+            file_size = os.path.getsize(temp_path)
+
+            # Check if it's a ZIP file and extract
+            if filename.lower().endswith('.zip') or zipfile.is_zipfile(temp_path):
+                # Create extraction folder using skill title
+                extract_name = SKILL_TITLE if not SKILL_TITLE.lower().endswith('.zip') else SKILL_TITLE[:-4]
+                extract_dir = os.path.join(skill_dir, extract_name)
+                os.makedirs(extract_dir, exist_ok=True)
+
+                print("Extracting...")
+                with zipfile.ZipFile(temp_path, 'r') as zf:
+                    zf.extractall(extract_dir)
+
+                # Remove the ZIP file after extraction
+                os.remove(temp_path)
+
+                # Count extracted files
+                extracted_files = [f for f in os.listdir(extract_dir) if not f.startswith('.')]
+                print(f"Extracted: {extract_name}/ ({len(extracted_files)} files)")
+            else:
+                # Not a ZIP, just rename to final name
+                final_path = os.path.join(skill_dir, filename)
+                os.rename(temp_path, final_path)
+                print(f"Saved: {filename} ({file_size} bytes)")
+
+        from datetime import datetime
+        info_file = os.path.join(skill_dir, "skill_info.txt")
+        with open(info_file, 'w', encoding='utf-8') as f:
+            f.write(f"Skill ID: {SKILL_ID}\\n")
+            f.write(f"Title: {SKILL_TITLE}\\n")
+            f.write(f"Installed: {datetime.now().isoformat()}\\n")
+
+        print("")
+        print("=" * 50)
+        print("Done! Files saved to: " + skill_dir)
+        print("=" * 50)
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+if __name__ == "__main__":
+    download_and_extract()
+`;
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(pythonScript);
+
+    pool.execute(
+      'UPDATE skills SET downloads = downloads + 1 WHERE id = ?',
+      [skill.id]
+    );
+  } catch (error) {
+    console.error('Install link error:', error);
+    res.status(500).send('# Error: Server error');
+  }
+});
 
 // 批量生成安装脚本和下载链接
 router.post('/batch-install', async (req, res) => {
@@ -985,6 +1117,7 @@ import sys
 import urllib.request
 import shutil
 import argparse
+import zipfile
 from datetime import datetime
 
 SERVER_URL = "${serverUrl}"
@@ -993,8 +1126,8 @@ SKILLS = [
 ${skillDataList}
 ]
 
-def download_skill(skill_id, skill_title, target_dir):
-    """Download a single skill file"""
+def download_and_extract(skill_id, skill_title, target_dir):
+    """Download and extract a skill file"""
     file_url = f"{SERVER_URL}/api/skills/{skill_id}/file"
     try:
         req = urllib.request.Request(file_url)
@@ -1004,14 +1137,42 @@ def download_skill(skill_id, skill_title, target_dir):
             if 'filename=' in content_disp:
                 filename = content_disp.split('filename=')[-1].strip().strip('"')
 
-            file_path = os.path.join(target_dir, filename)
-            with open(file_path, 'wb') as f:
+            # Download to temp location
+            temp_path = os.path.join(target_dir, '_temp_' + filename)
+            with open(temp_path, 'wb') as f:
                 shutil.copyfileobj(response, f)
 
-            file_size = os.path.getsize(file_path)
-            print(f"  [OK] {skill_title} -> {filename} ({file_size} bytes)")
-            return True, filename
+            file_size = os.path.getsize(temp_path)
+
+            # Check if it's a ZIP file and extract
+            if filename.lower().endswith('.zip') or zipfile.is_zipfile(temp_path):
+                # Create extraction folder using skill title (remove .zip extension)
+                extract_name = skill_title if not skill_title.lower().endswith('.zip') else skill_title[:-4]
+                extract_dir = os.path.join(target_dir, extract_name)
+                os.makedirs(extract_dir, exist_ok=True)
+
+                with zipfile.ZipFile(temp_path, 'r') as zf:
+                    zf.extractall(extract_dir)
+
+                # Remove the ZIP file after extraction
+                os.remove(temp_path)
+
+                # Count extracted files
+                extracted_files = [f for f in os.listdir(extract_dir) if not f.startswith('.')]
+                print(f"  [OK] {skill_title} -> {extract_name}/ ({len(extracted_files)} files extracted)")
+                return True, extract_name
+            else:
+                # Not a ZIP, just rename to final name
+                final_path = os.path.join(target_dir, filename)
+                os.rename(temp_path, final_path)
+                print(f"  [OK] {skill_title} -> {filename} ({file_size} bytes)")
+                return True, filename
     except Exception as e:
+        # Cleanup temp file if exists
+        temp_file = os.path.join(target_dir, '_temp_' + skill_title)
+        if os.path.exists(temp_file):
+            try: os.remove(temp_file)
+            except: pass
         print(f"  [FAIL] {skill_title}: {e}")
         return False, str(e)
 
@@ -1043,7 +1204,7 @@ def main():
 
     for i, skill in enumerate(SKILLS, 1):
         print(f"[{i}/{total}] Downloading: {skill['title']}")
-        ok, result = download_skill(skill['id'], skill['title'], skill_dir)
+        ok, result = download_and_extract(skill['id'], skill['title'], skill_dir)
         if ok:
             success += 1
         else:
@@ -1134,6 +1295,7 @@ import sys
 import urllib.request
 import shutil
 import argparse
+import zipfile
 from datetime import datetime
 
 SERVER_URL = "${serverUrl}"
@@ -1144,8 +1306,8 @@ SKILLS = [
 ${skillDataList}
 ]
 
-def download_skill(skill_id, skill_title, target_dir):
-    """Download a single skill file"""
+def download_and_extract(skill_id, skill_title, target_dir):
+    """Download and extract a skill file"""
     file_url = f"{SERVER_URL}/api/skills/{skill_id}/file"
     try:
         req = urllib.request.Request(file_url)
@@ -1155,14 +1317,42 @@ def download_skill(skill_id, skill_title, target_dir):
             if 'filename=' in content_disp:
                 filename = content_disp.split('filename=')[-1].strip().strip('"')
 
-            file_path = os.path.join(target_dir, filename)
-            with open(file_path, 'wb') as f:
+            # Download to temp location
+            temp_path = os.path.join(target_dir, '_temp_' + filename)
+            with open(temp_path, 'wb') as f:
                 shutil.copyfileobj(response, f)
 
-            file_size = os.path.getsize(file_path)
-            print(f"  [OK] {skill_title} -> {filename} ({file_size} bytes)")
-            return True, filename
+            file_size = os.path.getsize(temp_path)
+
+            # Check if it's a ZIP file and extract
+            if filename.lower().endswith('.zip') or zipfile.is_zipfile(temp_path):
+                # Create extraction folder using skill title (remove .zip extension)
+                extract_name = skill_title if not skill_title.lower().endswith('.zip') else skill_title[:-4]
+                extract_dir = os.path.join(target_dir, extract_name)
+                os.makedirs(extract_dir, exist_ok=True)
+
+                with zipfile.ZipFile(temp_path, 'r') as zf:
+                    zf.extractall(extract_dir)
+
+                # Remove the ZIP file after extraction
+                os.remove(temp_path)
+
+                # Count extracted files
+                extracted_files = [f for f in os.listdir(extract_dir) if not f.startswith('.')]
+                print(f"  [OK] {skill_title} -> {extract_name}/ ({len(extracted_files)} files extracted)")
+                return True, extract_name
+            else:
+                # Not a ZIP, just rename to final name
+                final_path = os.path.join(target_dir, filename)
+                os.rename(temp_path, final_path)
+                print(f"  [OK] {skill_title} -> {filename} ({file_size} bytes)")
+                return True, filename
     except Exception as e:
+        # Cleanup temp file if exists
+        temp_file = os.path.join(target_dir, '_temp_' + skill_title)
+        if os.path.exists(temp_file):
+            try: os.remove(temp_file)
+            except: pass
         print(f"  [FAIL] {skill_title}: {e}")
         return False, str(e)
 
@@ -1195,7 +1385,7 @@ def main():
 
     for i, skill in enumerate(SKILLS, 1):
         print(f"[{i}/{total}] Downloading: {skill['title']}")
-        ok, result = download_skill(skill['id'], skill['title'], skill_dir)
+        ok, result = download_and_extract(skill['id'], skill['title'], skill_dir)
         if ok:
             success += 1
         else:
@@ -1216,6 +1406,7 @@ def main():
     print("=" * 50)
     print(f"  Done! Success: {success}, Failed: {failed}")
     print(f"  Files saved to: {skill_dir}")
+    print("=" * 50)
     print("=" * 50)
 
 if __name__ == "__main__":

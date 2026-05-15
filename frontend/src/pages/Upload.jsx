@@ -590,34 +590,49 @@ export default function Upload() {
 
             <div className="mb-6">
               <label className="block text-gray-700 mb-2 font-medium">附件文件（可选）</label>
-              <p className="text-sm text-gray-500 mb-3">
-                支持选择 ZIP 文件或文件夹上传。文件夹会打包为 ZIP。最大 50MB。
-              </p>
 
-              {/* 统一的选择按钮 */}
-              <div className="relative">
+              {/* 提示信息 */}
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-yellow-700 text-sm">
+                    请确保文件夹或压缩包中包含 <strong>SKILL.md</strong> 文件（最多 200 个，总大小不超过 50.00 MB）
+                  </p>
+                </div>
+              </div>
+
+              {/* 美化的选择按钮 */}
+              <div className="grid grid-cols-2 gap-4">
                 <input type="file" onChange={handleFileChange} className="hidden" id="file-input" accept=".zip" />
                 <input type="file" onChange={handleFolderChange} className="hidden" id="folder-input" webkitdirectory="" directory="" />
 
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-primary-500 transition text-center">
-                  <div className="flex items-center justify-center gap-3">
-                    <label htmlFor="file-input" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
-                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* ZIP 文件选择卡片 */}
+                <label htmlFor="file-input" className="cursor-pointer group">
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-primary-500 hover:bg-primary-50 transition-all duration-200 text-center h-full flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-gray-100 group-hover:bg-primary-100 rounded-full flex items-center justify-center mb-4 transition-colors">
+                      <svg className="w-8 h-8 text-gray-400 group-hover:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                       </svg>
-                      <span className="text-gray-600">选择 ZIP 文件</span>
-                    </label>
+                    </div>
+                    <h3 className="text-gray-700 group-hover:text-primary-600 font-semibold mb-1 transition-colors">选择 ZIP 文件</h3>
+                    <p className="text-gray-500 text-sm">压缩包格式</p>
+                  </div>
+                </label>
 
-                    <span className="text-gray-400">或</span>
-
-                    <label htmlFor="folder-input" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
-                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* 文件夹选择卡片 */}
+                <label htmlFor="folder-input" className="cursor-pointer group">
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 text-center h-full flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-gray-100 group-hover:bg-blue-100 rounded-full flex items-center justify-center mb-4 transition-colors">
+                      <svg className="w-8 h-8 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                       </svg>
-                      <span className="text-gray-600">选择文件夹</span>
-                    </label>
+                    </div>
+                    <h3 className="text-gray-700 group-hover:text-blue-600 font-semibold mb-1 transition-colors">选择文件夹</h3>
+                    <p className="text-gray-500 text-sm">自动打包为 ZIP</p>
                   </div>
-                </div>
+                </label>
               </div>
 
               {/* 已选择的ZIP文件 */}
@@ -677,34 +692,49 @@ export default function Upload() {
               {/* 文件选择 */}
               <div className="mb-6">
                 <label className="block text-gray-700 mb-2 font-medium">选择 ZIP 文件或文件夹 *</label>
-                <p className="text-sm text-gray-500 mb-3">
-                  可以选择多个 ZIP 文件或文件夹。每个文件/文件夹会创建一个技能。文件夹会打包为 ZIP。
-                </p>
 
-                {/* 统一的选择按钮 */}
-                <div className="relative">
+                {/* 提示信息 */}
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-yellow-700 text-sm">
+                      请确保文件夹或压缩包中包含 <strong>SKILL.md</strong> 文件（最多 200 个，总大小不超过 50.00 MB）
+                    </p>
+                  </div>
+                </div>
+
+                {/* 美化的选择按钮 */}
+                <div className="grid grid-cols-2 gap-4">
                   <input type="file" onChange={handleBatchFilesChange} className="hidden" id="batch-file-input" multiple accept=".zip" />
                   <input type="file" onChange={handleBatchFolderChange} className="hidden" id="batch-folder-input" webkitdirectory="" directory="" />
 
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-primary-500 transition text-center">
-                    <div className="flex items-center justify-center gap-3">
-                      <label htmlFor="batch-file-input" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
-                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* ZIP 文件选择卡片 */}
+                  <label htmlFor="batch-file-input" className="cursor-pointer group">
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-primary-500 hover:bg-primary-50 transition-all duration-200 text-center h-full flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 bg-gray-100 group-hover:bg-primary-100 rounded-full flex items-center justify-center mb-4 transition-colors">
+                        <svg className="w-8 h-8 text-gray-400 group-hover:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                         </svg>
-                        <span className="text-gray-600">选择多个 ZIP 文件</span>
-                      </label>
+                      </div>
+                      <h3 className="text-gray-700 group-hover:text-primary-600 font-semibold mb-1 transition-colors">选择多个 ZIP 文件</h3>
+                      <p className="text-gray-500 text-sm">可同时选择多个压缩包</p>
+                    </div>
+                  </label>
 
-                      <span className="text-gray-400">或</span>
-
-                      <label htmlFor="batch-folder-input" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
-                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* 文件夹选择卡片 */}
+                  <label htmlFor="batch-folder-input" className="cursor-pointer group">
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 text-center h-full flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 bg-gray-100 group-hover:bg-blue-100 rounded-full flex items-center justify-center mb-4 transition-colors">
+                        <svg className="w-8 h-8 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                         </svg>
-                        <span className="text-gray-600">选择文件夹</span>
-                      </label>
+                      </div>
+                      <h3 className="text-gray-700 group-hover:text-blue-600 font-semibold mb-1 transition-colors">选择文件夹</h3>
+                      <p className="text-gray-500 text-sm">自动打包为 ZIP</p>
                     </div>
-                  </div>
+                  </label>
                 </div>
               </div>
 

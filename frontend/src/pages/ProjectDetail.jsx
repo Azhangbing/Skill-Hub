@@ -164,8 +164,32 @@ export default function ProjectDetail() {
 
   // 复制下载链接
   const copyDownloadLink = () => {
-    navigator.clipboard.writeText(downloadLink)
-    setLinkCopied(true)
+    if (!downloadLink) return
+
+    // 使用兼容 HTTP 的复制方法
+    const textArea = document.createElement('textarea')
+    textArea.value = downloadLink
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-9999px'
+    textArea.style.top = '-9999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+
+    try {
+      const successful = document.execCommand('copy')
+      if (successful) {
+        setLinkCopied(true)
+        setTimeout(() => setLinkCopied(false), 2000)
+      } else {
+        alert('复制失败，请手动复制链接')
+      }
+    } catch (err) {
+      console.error('复制失败:', err)
+      alert('复制失败，请手动复制链接')
+    }
+
+    document.body.removeChild(textArea)
   }
 
   // 关闭下载链接弹窗

@@ -77,12 +77,41 @@ export default function SkillDetail() {
     }
   }
 
+  // 通用复制函数（兼容 HTTP 环境）
+  const copyToClipboard = (text) => {
+    if (!text) return false
+
+    // 使用兼容 HTTP 的复制方法
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-9999px'
+    textArea.style.top = '-9999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+
+    try {
+      const successful = document.execCommand('copy')
+      document.body.removeChild(textArea)
+      return successful
+    } catch (err) {
+      console.error('复制失败:', err)
+      document.body.removeChild(textArea)
+      return false
+    }
+  }
+
   // 复制安装命令
   const handleCopyCommand = () => {
     if (!skill?.install_command) return
-    navigator.clipboard.writeText(skill.install_command)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    const success = copyToClipboard(skill.install_command)
+    if (success) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } else {
+      alert('复制失败，请手动复制')
+    }
   }
 
   // 生成带目录参数的安装链接
@@ -109,9 +138,13 @@ export default function SkillDetail() {
   // 复制安装链接
   const handleCopyInstallLink = () => {
     if (!installLink) return
-    navigator.clipboard.writeText(installLink)
-    setInstallLinkCopied(true)
-    setTimeout(() => setInstallLinkCopied(false), 2000)
+    const success = copyToClipboard(installLink)
+    if (success) {
+      setInstallLinkCopied(true)
+      setTimeout(() => setInstallLinkCopied(false), 2000)
+    } else {
+      alert('复制失败，请手动复制')
+    }
   }
 
   // 预览文件内容
